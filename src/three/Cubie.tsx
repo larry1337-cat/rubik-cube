@@ -52,6 +52,7 @@ export const Cubie = forwardRef<THREE.Group, CubieProps>(({ cubieId, colors }, r
             smoothness={4}
             position={position}
             rotation={rotation}
+            userData={{ isSticker: true }}
           >
             <meshPhysicalMaterial
               color={color}
