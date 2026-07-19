@@ -48,7 +48,6 @@ interface CubeState {
 }
 
 const TURN_DURATION = 0.22;
-const SNAP_DURATION = 0.1;
 
 function inverseOf(name: string): string {
   return name.endsWith("'") ? name.slice(0, -1) : `${name}'`;
