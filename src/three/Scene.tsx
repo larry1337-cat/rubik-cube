@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { TrackballControls, ContactShadows } from "@react-three/drei";
 import { Cube3D } from "./Cube3D";
@@ -8,15 +8,10 @@ const CAMERA_POS: [number, number, number] = isMobile ? [6.5, 5.5, 8.0] : [4.2, 
 const CAMERA_FOV = isMobile ? 44 : 40;
 
 export function Scene() {
-  const trackballRef = useRef<any>(null);
+  const [dragging, setDragging] = useState(false);
 
-  const handleDragStart = useCallback(() => {
-    if (trackballRef.current) trackballRef.current.enabled = false;
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
-    if (trackballRef.current) trackballRef.current.enabled = true;
-  }, []);
+  const handleDragStart = useCallback(() => setDragging(true), []);
+  const handleDragEnd = useCallback(() => setDragging(false), []);
 
   return (
     <Canvas
@@ -49,7 +44,7 @@ export function Scene() {
       />
 
       <TrackballControls
-        ref={trackballRef}
+        enabled={!dragging}
         noPan
         minDistance={4}
         maxDistance={11}
