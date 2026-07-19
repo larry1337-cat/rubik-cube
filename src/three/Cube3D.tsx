@@ -42,8 +42,10 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
 
   useEffect(() => {
     const canvas = gl.domElement;
+    const previousTouchAction = canvas.style.touchAction;
+    canvas.style.touchAction = "none";
 
-    function handlePointerDown(event: PointerEvent) {
+    function raycastStickers(event: PointerEvent) {
       const rect = canvas.getBoundingClientRect();
       const ndc = new THREE.Vector2(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -56,11 +58,18 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       const meshes: THREE.Object3D[] = [];
       refs.current.forEach((group) =>
         group.traverse((o) => {
-          if ((o as THREE.Mesh).isMesh) meshes.push(o);
+          if ((o as THREE.Mesh).isMesh && o.userData.isSticker) meshes.push(o);
         })
       );
 
-      const hits = raycaster.intersectObjects(meshes, false);
+      return raycaster.intersectObjects(meshes, false);
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (event.target !== canvas) return;
+      if (!useCubeStore.getState().canBeginManual()) return;
+
+      const hits = raycastStickers(event);
       if (hits.length === 0 || !hits[0].face) return;
 
       const hitObj = hits[0].object;
@@ -72,6 +81,7 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       const worldPos = new THREE.Vector3();
       (group as THREE.Group).getWorldPosition(worldPos);
 
+      event.preventDefault();
       event.stopPropagation();
 
       drag.current = {
@@ -92,6 +102,8 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
     function handlePointerMove(event: PointerEvent) {
       const d = drag.current;
       if (!d) return;
+
+      event.preventDefault();
 
       const now = performance.now();
       d.history.push({ x: event.clientX, y: event.clientY, t: now });
@@ -148,9 +160,11 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
     function handlePointerUp() {
       const d = drag.current;
       drag.current = null;
+      if (!d) return;
+
       onDragEnd();
 
-      if (!d?.result) return;
+      if (!d.result) return;
 
       const store = useCubeStore.getState();
       const manual = store.manual;
@@ -173,14 +187,15 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       store.commitManual();
     }
 
-    canvas.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerdown", handlePointerDown, { capture: true, passive: false });
+    window.addEventListener("pointermove", handlePointerMove, { passive: false });
     window.addEventListener("pointerup", handlePointerUp);
 
     return () => {
-      canvas.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
+      canvas.style.touchAction = previousTouchAction;
     };
   }, [camera, gl, onDragStart, onDragEnd]);
 
