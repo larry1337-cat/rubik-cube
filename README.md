@@ -4,6 +4,8 @@ A playable 3D Rubik's Cube in the browser.
 
 Live: https://larry1337-cat.github.io/rubik-cube/
 
+![Preview](preview.png)
+
 ## Stack
 
 - React + TypeScript + Vite
