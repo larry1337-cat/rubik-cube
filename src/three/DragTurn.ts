@@ -1,7 +1,6 @@
 import * as THREE from "three";
-import type { Axis, Move } from "../cube/cubeModel";
-import { AXIS_VECTOR } from "../cube/cubeModel";
-import { MOVE_TABLE } from "../cube/cubeModel";
+import type { Axis } from "../cube/cubeModel";
+import { AXIS_VECTOR, MOVE_TABLE } from "../cube/cubeModel";
 
 export interface DragTurnResult {
   axis: Axis;
