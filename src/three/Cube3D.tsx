@@ -3,9 +3,9 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useCubeStore } from "../store/cubeStore";
 import { AXIS_VECTOR, createSolvedCube } from "../cube/cubeModel";
+import type { Move } from "../cube/cubeModel";
 import { Cubie } from "./Cubie";
-import { inferTurn } from "./DragTurn";
-import type { DragTurnResult } from "./DragTurn";
+import { inferTurnAxis } from "./DragTurn";
 
 const SPACING = 1.02;
 const DRAG_THRESHOLD = 8;
@@ -22,7 +22,7 @@ interface DragState {
   startY: number;
   faceNormal: THREE.Vector3;
   cubieWorldPos: THREE.Vector3;
-  result: DragTurnResult | null;
+  result: Move | null;
   dragAxis2D: THREE.Vector2 | null;
   history: { x: number; y: number; t: number }[];
   velocityX: number;
@@ -122,26 +122,27 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       if (!d.result) {
         if (dist < DRAG_THRESHOLD) return;
 
-        const result = inferTurn(
+        const turnAxis = inferTurnAxis(
           new THREE.Vector2(dx, dy),
           d.faceNormal,
           d.cubieWorldPos,
           camera
         );
-        if (!result) return;
+        if (!turnAxis) return;
 
-        d.result = result;
-
-        const axisVec = AXIS_VECTOR[result.axis].clone();
+        const axisVec = AXIS_VECTOR[turnAxis.axis].clone();
         const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
         const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-        const faceVec = d.faceNormal.clone();
-        const moveVec = new THREE.Vector3().crossVectors(faceVec, axisVec).normalize();
+        const moveVec = new THREE.Vector3().crossVectors(d.faceNormal, axisVec).normalize();
         const dragAxis2D = new THREE.Vector2(moveVec.dot(camRight), -moveVec.dot(camUp));
-        if (dragAxis2D.dot(new THREE.Vector2(dx, dy)) < 0) dragAxis2D.negate();
+        const aligned = dragAxis2D.dot(new THREE.Vector2(dx, dy)) >= 0;
+        const direction = (aligned ? -1 : 1) as 1 | -1;
+        if (!aligned) dragAxis2D.negate();
+
+        d.result = { axis: turnAxis.axis, layer: turnAxis.layer, direction };
         d.dragAxis2D = dragAxis2D;
 
-        useCubeStore.getState().beginManual(result);
+        useCubeStore.getState().beginManual(d.result);
         return;
       }
 
