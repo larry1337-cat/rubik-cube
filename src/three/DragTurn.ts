@@ -29,52 +29,41 @@ export function inferTurn(
   cubieWorldPos: THREE.Vector3,
   camera: THREE.Camera
 ): DragTurnResult | null {
-  // Camera basis vectors in world space
   const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
   const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
 
-  // World-space drag vector
   const dragWorld = camRight
     .clone()
     .multiplyScalar(dragDelta.x)
-    .addScaledVector(camUp, -dragDelta.y)
+    .addScaledVector(camUp, dragDelta.y)
     .normalize();
 
-  // Remove faceNormal component — project drag onto the face plane
   dragWorld.addScaledVector(faceNormal, -dragWorld.dot(faceNormal));
   if (dragWorld.length() < 1e-4) return null;
   dragWorld.normalize();
 
-  // The face this sticker belongs to
   const faceAxisInfo = dominantAxis(faceNormal);
   const faceAxis = faceAxisInfo.axis;
 
-  // The direction the user dragged (axis-aligned, excluding face axis)
   const dragAxisInfo = dominantAxis(dragWorld, faceAxis);
   const dragAxis = dragAxisInfo.axis;
   const dragSign = dragAxisInfo.sign;
 
-  // Rotation axis = faceNormal cross dragDir
   const faceVec = AXIS_VECTOR[faceAxis].clone().multiplyScalar(faceAxisInfo.sign);
   const dragVec = AXIS_VECTOR[dragAxis].clone().multiplyScalar(dragSign);
   const rotWorld = new THREE.Vector3().crossVectors(faceVec, dragVec);
 
-  const rotAxisInfo = dominantAxis(rotWorld, undefined);
+  const rotAxisInfo = dominantAxis(rotWorld);
   const rotAxis = rotAxisInfo.axis;
   const rotSign = Math.sign(rotWorld[rotAxis]) || 1;
 
-  // Layer = which slice along rotAxis the cubie belongs to
   const layerVal = Math.round(cubieWorldPos[rotAxis]);
   if (layerVal === 0) return null;
   const layer = (layerVal > 0 ? 1 : -1) as -1 | 1;
 
-  // Direction: positive rotSign with positive layer → check against MOVE_TABLE convention
-  // We need to find the move that matches axis+layer and determine which direction sign
-  // is "clockwise" per our convention, then adjust for rotSign * layer sign
-  const rawDir = rotSign * (layerVal > 0 ? 1 : -1);
+  const rawDir = -(rotSign * (layerVal > 0 ? 1 : -1));
   const direction = (rawDir >= 0 ? 1 : -1) as 1 | -1;
 
-  // Validate this matches a known move
   const validMove = Object.values(MOVE_TABLE).some(
     (m) => m.axis === rotAxis && m.layer === layer
   );
