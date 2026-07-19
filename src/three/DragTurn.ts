@@ -61,8 +61,7 @@ export function inferTurn(
   if (layerVal === 0) return null;
   const layer = (layerVal > 0 ? 1 : -1) as -1 | 1;
 
-  const rawDir = -(rotSign * (layerVal > 0 ? 1 : -1));
-  const direction = (rawDir >= 0 ? 1 : -1) as 1 | -1;
+  const direction = (rotSign > 0 ? -1 : 1) as 1 | -1;
 
   const validMove = Object.values(MOVE_TABLE).some(
     (m) => m.axis === rotAxis && m.layer === layer
