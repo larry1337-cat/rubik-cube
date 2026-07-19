@@ -41,6 +41,7 @@ interface CubeState {
   reset: () => void;
   undo: () => void;
   tick: (deltaSeconds: number) => void;
+  canBeginManual: () => boolean;
   beginManual: (move: Move) => void;
   updateManual: (angle: number) => void;
   commitManual: () => void;
@@ -51,6 +52,19 @@ const TURN_DURATION = 0.22;
 
 function inverseOf(name: string): string {
   return name.endsWith("'") ? name.slice(0, -1) : `${name}'`;
+}
+
+function canManualStart(state: Pick<CubeState, "active" | "queue" | "isScrambling">): boolean {
+  return !state.active && state.queue.length === 0 && !state.isScrambling;
+}
+
+function findMoveName(move: Move): string | null {
+  for (const [name, m] of Object.entries(MOVE_TABLE)) {
+    if (m.axis === move.axis && m.layer === move.layer && m.direction === move.direction) {
+      return name;
+    }
+  }
+  return null;
 }
 
 export const useCubeStore = create<CubeState>((set, get) => ({
@@ -151,9 +165,11 @@ export const useCubeStore = create<CubeState>((set, get) => ({
     }
   },
 
+  canBeginManual: () => canManualStart(get()),
+
   beginManual: (move: Move) => {
     const state = get();
-    if (state.active || state.queue.length > 0 || state.isScrambling) return;
+    if (!canManualStart(state)) return;
     const affected = cubiesInLayer(state.cubies, move.axis, move.layer);
     set({
       manual: { move, affected, angle: 0 },
@@ -208,12 +224,3 @@ export const useCubeStore = create<CubeState>((set, get) => ({
     set({ manual: null });
   },
 }));
-
-function findMoveName(move: Move): string | null {
-  for (const [name, m] of Object.entries(MOVE_TABLE)) {
-    if (m.axis === move.axis && m.layer === move.layer && m.direction === move.direction) {
-      return name;
-    }
-  }
-  return null;
-}
