@@ -3,6 +3,10 @@ import { Canvas } from "@react-three/fiber";
 import { TrackballControls, ContactShadows } from "@react-three/drei";
 import { Cube3D } from "./Cube3D";
 
+const isMobile = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+const CAMERA_POS: [number, number, number] = isMobile ? [6.5, 5.5, 8.0] : [4.2, 3.6, 5.2];
+const CAMERA_FOV = isMobile ? 44 : 40;
+
 export function Scene() {
   const trackballRef = useRef<any>(null);
 
@@ -17,7 +21,7 @@ export function Scene() {
   return (
     <Canvas
       shadows
-      camera={{ position: [4.2, 3.6, 5.2], fov: 40 }}
+      camera={{ position: CAMERA_POS, fov: CAMERA_FOV }}
       gl={{ antialias: true }}
     >
       <color attach="background" args={["#eef4f9"]} />
