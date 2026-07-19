@@ -11,6 +11,7 @@ const SPACING = 1.02;
 const DRAG_THRESHOLD = 8;
 const DRAG_TO_ANGLE = 0.018;
 const SWIPE_VELOCITY_THRESHOLD = 0.5;
+const VELOCITY_WINDOW_MS = 60;
 
 function easeInOutQuad(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -23,9 +24,7 @@ interface DragState {
   cubieWorldPos: THREE.Vector3;
   result: DragTurnResult | null;
   dragAxis2D: THREE.Vector2 | null;
-  lastX: number;
-  lastY: number;
-  lastTime: number;
+  history: { x: number; y: number; t: number }[];
   velocityX: number;
   velocityY: number;
 }
@@ -82,9 +81,7 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         cubieWorldPos: worldPos,
         result: null,
         dragAxis2D: null,
-        lastX: event.clientX,
-        lastY: event.clientY,
-        lastTime: performance.now(),
+        history: [{ x: event.clientX, y: event.clientY, t: performance.now() }],
         velocityX: 0,
         velocityY: 0,
       };
@@ -97,12 +94,14 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       if (!d) return;
 
       const now = performance.now();
-      const dt = Math.max(now - d.lastTime, 1);
-      d.velocityX = (event.clientX - d.lastX) / dt;
-      d.velocityY = (event.clientY - d.lastY) / dt;
-      d.lastX = event.clientX;
-      d.lastY = event.clientY;
-      d.lastTime = now;
+      d.history.push({ x: event.clientX, y: event.clientY, t: now });
+      while (d.history.length > 1 && now - d.history[0].t > VELOCITY_WINDOW_MS) {
+        d.history.shift();
+      }
+      const oldest = d.history[0];
+      const dt = Math.max(now - oldest.t, 1);
+      d.velocityX = (event.clientX - oldest.x) / dt;
+      d.velocityY = (event.clientY - oldest.y) / dt;
 
       const dx = event.clientX - d.startX;
       const dy = event.clientY - d.startY;
@@ -126,7 +125,9 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
         const faceVec = d.faceNormal.clone();
         const moveVec = new THREE.Vector3().crossVectors(faceVec, axisVec).normalize();
-        d.dragAxis2D = new THREE.Vector2(moveVec.dot(camRight), -moveVec.dot(camUp));
+        const dragAxis2D = new THREE.Vector2(moveVec.dot(camRight), -moveVec.dot(camUp));
+        if (dragAxis2D.dot(new THREE.Vector2(dx, dy)) < 0) dragAxis2D.negate();
+        d.dragAxis2D = dragAxis2D;
 
         useCubeStore.getState().beginManual(result);
         return;
