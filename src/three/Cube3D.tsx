@@ -8,8 +8,9 @@ import { inferTurn } from "./DragTurn";
 import type { DragTurnResult } from "./DragTurn";
 
 const SPACING = 1.02;
-const DRAG_THRESHOLD = 4;
-const DRAG_TO_ANGLE = 0.018; // radians per pixel
+const DRAG_THRESHOLD = 8;
+const DRAG_TO_ANGLE = 0.018;
+const SWIPE_VELOCITY_THRESHOLD = 0.5;
 
 function easeInOutQuad(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
@@ -22,6 +23,11 @@ interface DragState {
   cubieWorldPos: THREE.Vector3;
   result: DragTurnResult | null;
   dragAxis2D: THREE.Vector2 | null;
+  lastX: number;
+  lastY: number;
+  lastTime: number;
+  velocityX: number;
+  velocityY: number;
 }
 
 interface Cube3DProps {
@@ -76,6 +82,11 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         cubieWorldPos: worldPos,
         result: null,
         dragAxis2D: null,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        lastTime: performance.now(),
+        velocityX: 0,
+        velocityY: 0,
       };
 
       onDragStart();
@@ -84,6 +95,14 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
     function handlePointerMove(event: PointerEvent) {
       const d = drag.current;
       if (!d) return;
+
+      const now = performance.now();
+      const dt = Math.max(now - d.lastTime, 1);
+      d.velocityX = (event.clientX - d.lastX) / dt;
+      d.velocityY = (event.clientY - d.lastY) / dt;
+      d.lastX = event.clientX;
+      d.lastY = event.clientY;
+      d.lastTime = now;
 
       const dx = event.clientX - d.startX;
       const dy = event.clientY - d.startY;
@@ -102,13 +121,9 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
 
         d.result = result;
 
-        // project world axis of rotation onto screen to get 2D drag direction
         const axisVec = AXIS_VECTOR[result.axis].clone();
-        // perpendicular to drag and faceNormal → the axis that maps to screen drag
-        const camRight = new THREE.Vector3(1, 0, 0).transformDirection(camera.matrixWorld);
-        const camUp = new THREE.Vector3(0, 1, 0).transformDirection(camera.matrixWorld);
-        // Find which screen direction maps to dragging this layer
-        // The move axis in screen space:
+        const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+        const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
         const faceVec = d.faceNormal.clone();
         const moveVec = new THREE.Vector3().crossVectors(faceVec, axisVec).normalize();
         d.dragAxis2D = new THREE.Vector2(moveVec.dot(camRight), -moveVec.dot(camUp));
@@ -135,7 +150,26 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       onDragEnd();
 
       if (!d?.result) return;
-      useCubeStore.getState().commitManual();
+
+      const store = useCubeStore.getState();
+      const manual = store.manual;
+
+      if (manual) {
+        const velocityAlongAxis = d.dragAxis2D
+          ? new THREE.Vector2(d.velocityX, d.velocityY).dot(
+              d.dragAxis2D.clone().normalize()
+            ) * d.result.direction
+          : 0;
+
+        const isSwipe = Math.abs(velocityAlongAxis) > SWIPE_VELOCITY_THRESHOLD;
+
+        if (isSwipe) {
+          const forcedAngle = velocityAlongAxis > 0 ? Math.PI / 2 : -Math.PI / 2;
+          store.updateManual(forcedAngle);
+        }
+      }
+
+      store.commitManual();
     }
 
     canvas.addEventListener("pointerdown", handlePointerDown);
