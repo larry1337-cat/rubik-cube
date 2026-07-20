@@ -82,7 +82,6 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       (group as THREE.Group).getWorldPosition(worldPos);
 
       event.preventDefault();
-      event.stopPropagation();
 
       drag.current = {
         startX: event.clientX,
@@ -95,8 +94,6 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         velocityX: 0,
         velocityY: 0,
       };
-
-      onDragStart();
     }
 
     function handlePointerMove(event: PointerEvent) {
@@ -130,6 +127,8 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         );
         if (!turnAxis) return;
 
+        onDragStart();
+
         const axisVec = AXIS_VECTOR[turnAxis.axis].clone();
         const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
         const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
@@ -162,10 +161,9 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
       const d = drag.current;
       drag.current = null;
       if (!d) return;
+      if (!d.result) return;
 
       onDragEnd();
-
-      if (!d.result) return;
 
       const store = useCubeStore.getState();
       const manual = store.manual;
