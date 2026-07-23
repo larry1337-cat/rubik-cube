@@ -1,24 +1,47 @@
-import { useState, useCallback } from "react";
-import { Canvas } from "@react-three/fiber";
+import { useState, useCallback, useEffect } from "react";
+import * as THREE from "three";
+import { Canvas, useThree } from "@react-three/fiber";
 import { TrackballControls, ContactShadows } from "@react-three/drei";
 import { Cube3D } from "./Cube3D";
+import { useDeviceType } from "../hooks/useDeviceType";
+import type { DeviceType } from "../hooks/useDeviceType";
 
-const isMobile = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-const CAMERA_POS: [number, number, number] = isMobile ? [6.5, 5.5, 8.0] : [4.2, 3.6, 5.2];
-const CAMERA_FOV = isMobile ? 44 : 40;
+function cameraFor(device: DeviceType) {
+  const touch = device === "touch";
+  return {
+    position: (touch ? [6.5, 5.5, 8.0] : [4.2, 3.6, 5.2]) as [number, number, number],
+    fov: touch ? 44 : 40,
+  };
+}
+
+function CameraRig({ device }: { device: DeviceType }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    const { position, fov } = cameraFor(device);
+    camera.position.set(position[0], position[1], position[2]);
+    (camera as THREE.PerspectiveCamera).fov = fov;
+    camera.updateProjectionMatrix();
+  }, [camera, device]);
+  return null;
+}
 
 export function Scene() {
+  const device = useDeviceType();
   const [dragging, setDragging] = useState(false);
 
   const handleDragStart = useCallback(() => setDragging(true), []);
   const handleDragEnd = useCallback(() => setDragging(false), []);
 
+  const initial = cameraFor(device);
+
   return (
     <Canvas
       shadows
-      camera={{ position: CAMERA_POS, fov: CAMERA_FOV }}
+      camera={{ position: initial.position, fov: initial.fov }}
       gl={{ antialias: true }}
     >
+      <CameraRig device={device} />
+
       <color attach="background" args={["#eef4f9"]} />
       <fog attach="fog" args={["#eef4f9", 9, 16]} />
 

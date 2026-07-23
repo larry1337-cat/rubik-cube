@@ -27,6 +27,8 @@ interface DragState {
   history: { x: number; y: number; t: number }[];
   velocityX: number;
   velocityY: number;
+  camStart: THREE.Vector3;
+  upStart: THREE.Vector3;
 }
 
 interface Cube3DProps {
@@ -93,6 +95,8 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         history: [{ x: event.clientX, y: event.clientY, t: performance.now() }],
         velocityX: 0,
         velocityY: 0,
+        camStart: camera.position.clone(),
+        upStart: camera.up.clone(),
       };
     }
 
@@ -128,6 +132,8 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         if (!turnAxis) return;
 
         onDragStart();
+        camera.position.copy(d.camStart);
+        camera.up.copy(d.upStart);
 
         const axisVec = AXIS_VECTOR[turnAxis.axis].clone();
         const camRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
@@ -138,7 +144,7 @@ export function Cube3D({ onDragStart, onDragEnd }: Cube3DProps) {
         const direction = (aligned ? -1 : 1) as 1 | -1;
         if (!aligned) dragAxis2D.negate();
 
-        d.result = { axis: turnAxis.axis, layer: turnAxis.layer, direction };
+        d.result = { axis: turnAxis.axis, layers: [turnAxis.layer], direction };
         d.dragAxis2D = dragAxis2D;
 
         useCubeStore.getState().beginManual(d.result);

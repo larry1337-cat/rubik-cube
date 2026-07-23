@@ -5,7 +5,8 @@ import {
   MOVE_TABLE,
   commitRotation,
   createSolvedCube,
-  cubiesInLayer,
+  cubiesForMove,
+  isRotation,
   isSolved,
   randomScramble,
 } from "../cube/cubeModel";
@@ -31,6 +32,7 @@ interface CubeState {
   history: string[];
   moveCount: number;
   turnCount: number;
+  undoCount: number;
   isScrambling: boolean;
   solved: boolean;
   startedAt: number | null;
@@ -60,7 +62,12 @@ function canManualStart(state: Pick<CubeState, "active" | "queue" | "isScramblin
 
 function findMoveName(move: Move): string | null {
   for (const [name, m] of Object.entries(MOVE_TABLE)) {
-    if (m.axis === move.axis && m.layer === move.layer && m.direction === move.direction) {
+    if (
+      m.axis === move.axis &&
+      m.direction === move.direction &&
+      m.layers.length === move.layers.length &&
+      m.layers.every((l) => move.layers.includes(l))
+    ) {
       return name;
     }
   }
@@ -75,17 +82,20 @@ export const useCubeStore = create<CubeState>((set, get) => ({
   history: [],
   moveCount: 0,
   turnCount: 0,
+  undoCount: 0,
   isScrambling: false,
   solved: true,
   startedAt: null,
   solvedAt: null,
 
   enqueueMove: (name: string) => {
-    if (!MOVE_TABLE[name]) return;
+    const move = MOVE_TABLE[name];
+    if (!move) return;
+    const rotation = isRotation(move);
     set((state) => ({
       queue: [...state.queue, name],
-      startedAt: state.startedAt ?? Date.now(),
-      solvedAt: null,
+      startedAt: rotation ? state.startedAt : state.startedAt ?? Date.now(),
+      solvedAt: rotation ? state.solvedAt : null,
     }));
   },
 
@@ -95,6 +105,8 @@ export const useCubeStore = create<CubeState>((set, get) => ({
       queue: moves,
       isScrambling: true,
       moveCount: 0,
+      turnCount: 0,
+      undoCount: 0,
       history: [],
       startedAt: null,
       solvedAt: null,
@@ -111,6 +123,8 @@ export const useCubeStore = create<CubeState>((set, get) => ({
       manual: null,
       history: [],
       moveCount: 0,
+      turnCount: 0,
+      undoCount: 0,
       isScrambling: false,
       solved: true,
       startedAt: null,
@@ -123,7 +137,7 @@ export const useCubeStore = create<CubeState>((set, get) => ({
     if (state.active || state.queue.length > 0 || state.isScrambling || state.manual) return;
     const last = state.history[state.history.length - 1];
     if (!last) return;
-    set({ history: state.history.slice(0, -1) });
+    set({ history: state.history.slice(0, -1), undoCount: state.undoCount + 1 });
     get().enqueueMove(inverseOf(last));
   },
 
@@ -134,7 +148,7 @@ export const useCubeStore = create<CubeState>((set, get) => ({
     if (!active && queue.length > 0) {
       const name = queue[0];
       const move = MOVE_TABLE[name];
-      const affected = cubiesInLayer(state.cubies, move.axis, move.layer);
+      const affected = cubiesForMove(state.cubies, move);
       active = { name, move, affected, progress: 0 };
       queue = queue.slice(1);
     }
@@ -146,19 +160,28 @@ export const useCubeStore = create<CubeState>((set, get) => ({
     if (progress >= 1) {
       commitRotation(active.affected, active.move.axis, active.move.direction);
 
+      const isUndo = state.undoCount > 0;
+      const rotation = isRotation(active.move);
       const stillScrambling = state.isScrambling && queue.length > 0;
       const nowSolved = queue.length === 0 ? isSolved(state.cubies) : state.solved;
-      const recordHistory = !state.isScrambling;
+      const recordHistory = !state.isScrambling && !isUndo;
 
       set({
         active: null,
         queue,
-        turnCount: state.turnCount + 1,
+        turnCount: state.isScrambling ? state.turnCount : state.turnCount + 1,
         history: recordHistory ? [...state.history, active.name] : state.history,
-        moveCount: state.isScrambling ? state.moveCount : state.moveCount + 1,
+        moveCount:
+          state.isScrambling || rotation
+            ? state.moveCount
+            : isUndo
+            ? state.moveCount - 1
+            : state.moveCount + 1,
+        undoCount: isUndo ? state.undoCount - 1 : state.undoCount,
         isScrambling: stillScrambling,
         solved: nowSolved,
-        solvedAt: !stillScrambling && nowSolved && !state.solved ? Date.now() : state.solvedAt,
+        solvedAt:
+          !stillScrambling && !isUndo && nowSolved && !state.solved ? Date.now() : state.solvedAt,
       });
     } else {
       set({ active: { ...active, progress }, queue });
@@ -170,7 +193,7 @@ export const useCubeStore = create<CubeState>((set, get) => ({
   beginManual: (move: Move) => {
     const state = get();
     if (!canManualStart(state)) return;
-    const affected = cubiesInLayer(state.cubies, move.axis, move.layer);
+    const affected = cubiesForMove(state.cubies, move);
     set({
       manual: { move, affected, angle: 0 },
       startedAt: state.startedAt ?? Date.now(),
@@ -204,17 +227,16 @@ export const useCubeStore = create<CubeState>((set, get) => ({
       commitRotation(affected, move.axis, direction);
     }
 
-    const moveName = direction === move.direction
-      ? findMoveName(move)
-      : findMoveName({ ...move, direction: (move.direction * -1) as 1 | -1 });
+    const moveName = findMoveName(direction === move.direction ? move : { ...move, direction });
+    const added = moveName ? Array<string>(times).fill(moveName) : [];
 
     const nowSolved = isSolved(state.cubies);
 
     set({
       manual: null,
       turnCount: state.turnCount + 1,
-      history: moveName ? [...state.history, moveName] : state.history,
-      moveCount: state.moveCount + 1,
+      history: [...state.history, ...added],
+      moveCount: state.moveCount + times,
       solved: nowSolved,
       solvedAt: nowSolved && !state.solved ? Date.now() : state.solvedAt,
     });

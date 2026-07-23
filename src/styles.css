@@ -412,3 +412,52 @@ button:focus-visible {
     opacity: 0.15;
   }
 }
+
+.keybind-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.keybind-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.keybind-row__key {
+  min-width: 96px;
+  padding: 4px 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  background: #f1f4f8;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.keybind-row__key.is-capturing {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.keybind-reset {
+  margin-top: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.face-grid--extra {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--panel-border);
+}

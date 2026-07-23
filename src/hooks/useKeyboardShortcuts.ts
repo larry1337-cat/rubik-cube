@@ -1,10 +1,7 @@
 import { useEffect } from "react";
 import { useCubeStore } from "../store/cubeStore";
-import { FACE_KEYS, ACTION_KEYS } from "../config/keybindings";
-
-const KEY_TO_FACE = Object.fromEntries(
-  Object.entries(FACE_KEYS).map(([face, key]) => [key.toLowerCase(), face])
-);
+import { useKeybindings } from "../store/keybindingsStore";
+import { ACTION_KEYS, MOVE_KEYS } from "../config/keybindings";
 
 interface Options {
   onToggleHelp?: () => void;
@@ -16,10 +13,11 @@ export function useKeyboardShortcuts({ onToggleHelp }: Options = {}) {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
 
-      const face = KEY_TO_FACE[event.key.toLowerCase()];
-      if (face) {
+      const bindings = useKeybindings.getState().bindings;
+      const key = MOVE_KEYS.find((k) => bindings[k] === event.code);
+      if (key) {
         event.preventDefault();
-        useCubeStore.getState().enqueueMove(event.shiftKey ? `${face}'` : face);
+        useCubeStore.getState().enqueueMove(event.shiftKey ? `${key}'` : key);
         return;
       }
 

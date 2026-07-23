@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useCubeStore } from "../store/cubeStore";
+import { useKeybindings } from "../store/keybindingsStore";
 import { useDeviceType } from "../hooks/useDeviceType";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
-import { FACE_KEYS } from "../config/keybindings";
+import { keyLabel, MOVE_KEYS, MOVE_KEY_LABELS } from "../config/keybindings";
+import type { MoveKey } from "../config/keybindings";
 
 const FACE_GROUPS: { label: string; moves: [string, string] }[] = [
   { label: "Up", moves: ["U", "U'"] },
@@ -13,10 +15,22 @@ const FACE_GROUPS: { label: string; moves: [string, string] }[] = [
   { label: "Back", moves: ["B", "B'"] },
 ];
 
-function keycapFor(move: string) {
-  const face = move.endsWith("'") ? move.slice(0, -1) : move;
-  const key = FACE_KEYS[face].toUpperCase();
-  return move.endsWith("'") ? `Shift+${key}` : key;
+const SLICE_GROUPS: { label: string; moves: [string, string] }[] = [
+  { label: "M", moves: ["M", "M'"] },
+  { label: "E", moves: ["E", "E'"] },
+  { label: "S", moves: ["S", "S'"] },
+];
+
+const ROTATION_GROUPS: { label: string; moves: [string, string] }[] = [
+  { label: "x", moves: ["x", "x'"] },
+  { label: "y", moves: ["y", "y'"] },
+  { label: "z", moves: ["z", "z'"] },
+];
+
+function keycapFor(move: string, bindings: Record<MoveKey, string>) {
+  const base = (move.endsWith("'") ? move.slice(0, -1) : move) as MoveKey;
+  const label = keyLabel(bindings[base]);
+  return move.endsWith("'") ? `Shift+${label}` : label;
 }
 
 function formatTime(ms: number) {
@@ -38,12 +52,29 @@ export function Controls() {
   const isScrambling = useCubeStore((s) => s.isScrambling);
   const historyLength = useCubeStore((s) => s.history.length);
 
+  const bindings = useKeybindings((s) => s.bindings);
+  const rebind = useKeybindings((s) => s.rebind);
+  const resetBindings = useKeybindings((s) => s.resetBindings);
+
   const device = useDeviceType();
   const isDesktop = device === "desktop";
 
   const [showHelp, setShowHelp] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [capturing, setCapturing] = useState<MoveKey | null>(null);
   useKeyboardShortcuts({ onToggleHelp: () => setShowHelp((v) => !v) });
+
+  useEffect(() => {
+    if (!capturing) return;
+    function onKey(event: KeyboardEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.code !== "Escape") rebind(capturing!, event.code);
+      setCapturing(null);
+    }
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capturing, rebind]);
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -81,15 +112,25 @@ export function Controls() {
 
       {showHelp && isDesktop && (
         <div className="help-card">
-          <div className="help-card__title">Shortcuts</div>
-          <div className="help-card__row">
-            <kbd>{Object.values(FACE_KEYS).map((k) => k.toUpperCase()).join(" ")}</kbd>
-            <span>turn face clockwise</span>
+          <div className="help-card__title">Keys</div>
+          <div className="keybind-list">
+            {MOVE_KEYS.map((key) => (
+              <div className="keybind-row" key={key}>
+                <span className="keybind-row__label">{MOVE_KEY_LABELS[key]}</span>
+                <button
+                  className={`keybind-row__key ${capturing === key ? "is-capturing" : ""}`}
+                  onClick={() => setCapturing(key)}
+                >
+                  {capturing === key ? "Press a key…" : keyLabel(bindings[key])}
+                </button>
+              </div>
+            ))}
           </div>
-          <div className="help-card__row"><kbd>Shift</kbd><span>+ letter turns counterclockwise</span></div>
+          <div className="help-card__row"><kbd>Shift</kbd><span>+ key turns counterclockwise</span></div>
           <div className="help-card__row"><kbd>Space</kbd><span>scramble</span></div>
           <div className="help-card__row"><kbd>Backspace</kbd><span>undo</span></div>
           <div className="help-card__row"><kbd>Esc</kbd><span>reset</span></div>
+          <button className="keybind-reset" onClick={resetBindings}>Reset keys</button>
         </div>
       )}
 
@@ -108,7 +149,23 @@ export function Controls() {
                     {moves.map((m) => (
                       <button key={m} onClick={() => enqueueMove(m)} disabled={isScrambling}>
                         {m}
-                        {isDesktop && <span className="keycap">{keycapFor(m)}</span>}
+                        {isDesktop && <span className="keycap">{keycapFor(m, bindings)}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="face-grid face-grid--extra">
+              {[...SLICE_GROUPS, ...ROTATION_GROUPS].map(({ label, moves }) => (
+                <div className="face-group" key={label}>
+                  <span className="face-group__label">{label}</span>
+                  <div className="face-group__buttons">
+                    {moves.map((m) => (
+                      <button key={m} onClick={() => enqueueMove(m)} disabled={isScrambling}>
+                        {m}
+                        {isDesktop && <span className="keycap">{keycapFor(m, bindings)}</span>}
                       </button>
                     ))}
                   </div>

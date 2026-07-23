@@ -4,7 +4,7 @@ import { AXIS_VECTOR, MOVE_TABLE } from "../cube/cubeModel";
 
 export interface DragTurnAxis {
   axis: Axis;
-  layer: -1 | 1;
+  layer: number;
 }
 
 const AXES: Axis[] = ["x", "y", "z"];
@@ -54,12 +54,10 @@ export function inferTurnAxis(
   const rotAxisInfo = dominantAxis(rotWorld);
   const rotAxis = rotAxisInfo.axis;
 
-  const layerVal = Math.round(cubieWorldPos[rotAxis]);
-  if (layerVal === 0) return null;
-  const layer = (layerVal > 0 ? 1 : -1) as -1 | 1;
+  const layer = Math.round(cubieWorldPos[rotAxis]);
 
   const validMove = Object.values(MOVE_TABLE).some(
-    (m) => m.axis === rotAxis && m.layer === layer
+    (m) => m.axis === rotAxis && m.layers.length === 1 && m.layers[0] === layer
   );
   if (!validMove) return null;
 

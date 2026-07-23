@@ -4,25 +4,19 @@ import { playTurnSound, playSolvedSound } from "./sounds";
 
 export function SoundEffects() {
   const turnCount = useCubeStore((s) => s.turnCount);
-  const solved = useCubeStore((s) => s.solved);
-  const skipTurn = useRef(true);
-  const skipSolved = useRef(true);
+  const solvedAt = useCubeStore((s) => s.solvedAt);
+  const lastTurn = useRef(turnCount);
+  const lastSolvedAt = useRef(solvedAt);
 
   useEffect(() => {
-    if (skipTurn.current) {
-      skipTurn.current = false;
-      return;
-    }
-    playTurnSound();
+    if (turnCount > lastTurn.current) playTurnSound();
+    lastTurn.current = turnCount;
   }, [turnCount]);
 
   useEffect(() => {
-    if (skipSolved.current) {
-      skipSolved.current = false;
-      return;
-    }
-    if (solved) playSolvedSound();
-  }, [solved]);
+    if (solvedAt && solvedAt !== lastSolvedAt.current) playSolvedSound();
+    lastSolvedAt.current = solvedAt;
+  }, [solvedAt]);
 
   return null;
 }
